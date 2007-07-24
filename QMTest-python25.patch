@@ -1,0 +1,1679 @@
+CodeSourcery > List Archives > qmtest  
+Actions  
+Post 
+Subscribe 
+Unsubscribe 
+[Date Prev][Date Next][Thread Prev][Thread Next][Date Index][Thread Index] 
+
+[qmtest] patch: Upgrade DocumentTemplate package for python 2.5 compatibility. 
+
+To: qmtest@xxxxxxxxxxxxxxxx 
+
+Subject: [qmtest] patch: Upgrade DocumentTemplate package for python 2.5 
+compatibility. 
+
+From: Stefan Seefeld <stefan@xxxxxxxxxxxxxxxx> 
+
+Date: Fri, 09 Feb 2007 19:47:06 -0500 
+
+The attached patch attempts to partially replace the (very old) version of
+the DocumentTemplate package once imported from Zope by a never version,
+in an attempt to make QMTest compatible with python 2.5.
+
+This version mainly replaces all uses of the 'regex' module by 're' (which,
+unfortunately is not trivial due to some subtle differences between the two,
+but it also contains some other small changes (e.g. replaces deprecated
+calls such as atoi() by int()).
+
+When using python 2.5, a warning about the (now deprecated) 'with' token
+is issued (as that apparently will become a keyword in 2.6), so I'm looking
+into replacing that, or merging more changes from a current Zope version
+in, depending on which is easier.
+
+Thanks,
+                Stefan
+
+-- 
+Stefan Seefeld
+CodeSourcery
+stefan@xxxxxxxxxxxxxxxx
+(650) 331-3385 x718
+
+Modified for QMTest-2.3 by <japhy@pld-linux.org>
+diff -ur qm-2.3.vanilla/qm/external/DocumentTemplate/DT_HTML.py qm-2.3/qm/external/DocumentTemplate/DT_HTML.py
+--- qm-2.3.vanilla/qm/external/DocumentTemplate/DT_HTML.py	2005-02-11 17:11:16.000000000 +0100
++++ qm-2.3/qm/external/DocumentTemplate/DT_HTML.py	2007-07-23 22:13:09.000000000 +0200
+@@ -1,130 +1,55 @@
+ ##############################################################################
+-# 
+-# Zope Public License (ZPL) Version 1.0
+-# -------------------------------------
+-# 
+-# Copyright (c) Digital Creations.  All rights reserved.
+-# 
+-# This license has been certified as Open Source(tm).
+-# 
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are
+-# met:
+-# 
+-# 1. Redistributions in source code must retain the above copyright
+-#    notice, this list of conditions, and the following disclaimer.
+-# 
+-# 2. Redistributions in binary form must reproduce the above copyright
+-#    notice, this list of conditions, and the following disclaimer in
+-#    the documentation and/or other materials provided with the
+-#    distribution.
+-# 
+-# 3. Digital Creations requests that attribution be given to Zope
+-#    in any manner possible. Zope includes a "Powered by Zope"
+-#    button that is installed by default. While it is not a license
+-#    violation to remove this button, it is requested that the
+-#    attribution remain. A significant investment has been put
+-#    into Zope, and this effort will continue if the Zope community
+-#    continues to grow. This is one way to assure that growth.
+-# 
+-# 4. All advertising materials and documentation mentioning
+-#    features derived from or use of this software must display
+-#    the following acknowledgement:
+-# 
+-#      "This product includes software developed by Digital Creations
+-#      for use in the Z Object Publishing Environment
+-#      (http://www.zope.org/)."
+-# 
+-#    In the event that the product being advertised includes an
+-#    intact Zope distribution (with copyright and license included)
+-#    then this clause is waived.
+-# 
+-# 5. Names associated with Zope or Digital Creations must not be used to
+-#    endorse or promote products derived from this software without
+-#    prior written permission from Digital Creations.
+-# 
+-# 6. Modified redistributions of any form whatsoever must retain
+-#    the following acknowledgment:
+-# 
+-#      "This product includes software developed by Digital Creations
+-#      for use in the Z Object Publishing Environment
+-#      (http://www.zope.org/)."
+-# 
+-#    Intact (re-)distributions of any official Zope release do not
+-#    require an external acknowledgement.
+-# 
+-# 7. Modifications are encouraged but must be packaged separately as
+-#    patches to official Zope releases.  Distributions that do not
+-#    clearly separate the patches from the original work must be clearly
+-#    labeled as unofficial distributions.  Modifications which do not
+-#    carry the name Zope may be packaged in any form, as long as they
+-#    conform to all of the clauses above.
+-# 
+-# 
+-# Disclaimer
+-# 
+-#   THIS SOFTWARE IS PROVIDED BY DIGITAL CREATIONS ``AS IS'' AND ANY
+-#   EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-#   PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL DIGITAL CREATIONS OR ITS
+-#   CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-#   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-#   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+-#   USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+-#   ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-#   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+-#   OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+-#   SUCH DAMAGE.
+-# 
+-# 
+-# This software consists of contributions made by Digital Creations and
+-# many individuals on behalf of Digital Creations.  Specific
+-# attributions are listed in the accompanying credits file.
+-# 
++#
++# Copyright (c) 2002 Zope Corporation and Contributors. All Rights Reserved.
++#
++# This software is subject to the provisions of the Zope Public License,
++# Version 2.1 (ZPL).  A copy of the ZPL should accompany this distribution.
++# THIS SOFTWARE IS PROVIDED "AS IS" AND ANY AND ALL EXPRESS OR IMPLIED
++# WARRANTIES ARE DISCLAIMED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF TITLE, MERCHANTABILITY, AGAINST INFRINGEMENT, AND FITNESS
++# FOR A PARTICULAR PURPOSE
++#
+ ##############################################################################
+ """HTML formated DocumentTemplates
+ 
+ $Id$"""
+ 
+ from DT_String import String, FileMixin
+-import DT_String, regex
++import DT_String, re
+ from DT_Util import ParseError, str
+-from string import strip, find, split, join, rfind, replace
+ 
+ class dtml_re_class:
+-
++    """ This needs to be replaced before 2.4.  It's a hackaround. """
+     def search(self, text, start=0,
+-               name_match=regex.compile('[\0- ]*[a-zA-Z]+[\0- ]*').match,
+-               end_match=regex.compile('[\0- ]*\(/\|end\)',
+-                                       regex.casefold).match,
+-               start_search=regex.compile('[<&]').search,
+-               ent_name=regex.compile('[-a-zA-Z0-9_.]+').match,
+-               find=find,
+-               strip=strip,
+-               replace=replace,
++               name_match=re.compile('[\000- ]*[a-zA-Z]+[\000- ]*').match,
++               end_match=re.compile('[\000- ]*(/|end)', re.I).match,
++               start_search=re.compile('[<&]').search,
++               ent_name=re.compile('[-a-zA-Z0-9_.]+').match,
+                ):
+ 
+         while 1:
+-            s=start_search(text, start)
+-            if s < 0: return -1
++            mo = start_search(text, start)
++            if mo is None: return None
++            s = mo.start(0)
+             if text[s:s+5] == '<!--#':
+                 n=s+5
+-                e=find(text,'-->',n)
+-                if e < 0: return -1
++                e=text.find('-->',n)
++                if e < 0: return None
+                 en=3
+ 
+-                l=end_match(text,n)
+-                if l > 0:
+-                    end=strip(text[n:n+l])
++                mo =end_match(text,n)
++                if mo is not None:
++                    l = mo.end(0) - mo.start(0)
++                    end=text[n:n+l].strip()
+                     n=n+l
+                 else: end=''
+ 
+             elif text[s:s+6] == '<dtml-':
+                 e=n=s+6
+                 while 1:
+-                    e=find(text,'>',e+1)
+-                    if e < 0: return -1
+-                    if len(split(text[n:e],'"'))%2:
++                    e=text.find('>',e+1)
++                    if e < 0: return None
++                    if len(text[n:e].split('"'))%2:
+                         # check for even number of "s inside
+                         break
+ 
+@@ -134,9 +60,9 @@
+             elif text[s:s+7] == '</dtml-':
+                 e=n=s+7
+                 while 1:
+-                    e=find(text,'>',e+1)
+-                    if e < 0: return -1
+-                    if len(split(text[n:e],'"'))%2:
++                    e=text.find('>',e+1)
++                    if e < 0: return None
++                    if len(text[n:e].split('"'))%2:
+                         # check for even number of "s inside
+                         break
+ 
+@@ -146,48 +72,54 @@
+             else:
+                 if text[s:s+5] == '&dtml' and text[s+5] in '.-':
+                     n=s+6
+-                    e=find(text,';',n)                        
++                    e=text.find(';',n)
+                     if e >= 0:
+                         args=text[n:e]
+                         l=len(args)
+-                        if ent_name(args) == l:
+-                            d=self.__dict__
+-                            if text[s+5]=='-':
+-                                d[1]=d['end']=''
+-                                d[2]=d['name']='var'
+-                                d[0]=text[s:e+1]
+-                                d[3]=d['args']=args+' html_quote'
+-                                return s
+-                            else:
+-                                nn=find(args,'-')
+-                                if nn >= 0 and nn < l-1:
++                        mo = ent_name(args)
++                        if mo is not None:
++                            if mo.end(0)-mo.start(0) == l:
++                                d=self.__dict__
++                                if text[s+5]=='-':
+                                     d[1]=d['end']=''
+                                     d[2]=d['name']='var'
+                                     d[0]=text[s:e+1]
+-                                    args=(args[nn+1:]+' '+
+-                                          replace(args[:nn],'.',' '))
+-                                    d[3]=d['args']=args
+-                                    return s
+-                        
++                                    d[3]=d['args']=args+' html_quote'
++                                    self._start = s
++                                    return self
++                                else:
++                                    nn=args.find('-')
++                                    if nn >= 0 and nn < l-1:
++                                        d[1]=d['end']=''
++                                        d[2]=d['name']='var'
++                                        d[0]=text[s:e+1]
++                                        args=args[nn+1:]+' '+ \
++                                              args[:nn].replace('.',' ')
++                                        d[3]=d['args']=args
++                                        self._start = s
++                                        return self
++
+                 start=s+1
+                 continue
+ 
+             break
+ 
+-        l=name_match(text,n)
+-        if l < 0: return l
++        mo = name_match(text,n)
++        if mo is None: return None
++        l = mo.end(0) - mo.start(0)
++
+         a=n+l
+-        name=strip(text[n:a])
++        name=text[n:a].strip()
+ 
+-        args=strip(text[a:e])
++        args=text[a:e].strip()
+ 
+         d=self.__dict__
+         d[0]=text[s:e+en]
+         d[1]=d['end']=end
+         d[2]=d['name']=name
+         d[3]=d['args']=args
+-
+-        return s
++        self._start = s
++        return self
+ 
+     def group(self, *args):
+         get=self.__dict__.get
+@@ -195,7 +127,8 @@
+             return get(args[0])
+         return tuple(map(get, args))
+ 
+-        
++    def start(self, *args):
++        return self._start
+ 
+ class HTML(DT_String.String):
+     """HTML Document Templates
+@@ -217,7 +150,7 @@
+         return dtml_re_class()
+ 
+     parseTag__roles__=()
+-    def parseTag(self, tagre, command=None, sargs=''):
++    def parseTag(self, match_ob, command=None, sargs=''):
+         """Parse a tag using an already matched re
+ 
+         Return: tag, args, command, coname
+@@ -229,8 +162,8 @@
+                coname is the name of a continue tag (e.g. else)
+                  or None otherwise
+         """
+-        tag, end, name, args, =tagre.group(0, 'end', 'name', 'args')
+-        args=strip(args)
++        tag, end, name, args = match_ob.group(0, 'end', 'name', 'args')
++        args=args.strip()
+         if end:
+             if not command or name != command.name:
+                 raise ParseError, ('unexpected end tag', tag)
+@@ -245,7 +178,7 @@
+                 if not (args==sargs or
+                         args==sargs[:l] and sargs[l:l+1] in ' \t\n'):
+                     return tag, args, self.commands[name], None
+-            
++
+             return tag, args, None, name
+ 
+         try: return tag, args, self.commands[name], None
+@@ -256,7 +189,7 @@
+     def SubTemplate(self, name): return HTML('', __name__=name)
+ 
+     varExtra__roles__=()
+-    def varExtra(self,tagre): return 's'
++    def varExtra(self, match_ob): return 's'
+ 
+     manage_edit__roles__=()
+     def manage_edit(self,data,REQUEST=None):
+@@ -274,7 +207,7 @@
+                        (('"'), '&quot;'))): #"
+         if text is None: text=self.read_raw()
+         for re,name in character_entities:
+-            if find(text, re) >= 0: text=join(split(text,re),name)
++            if text.find(re) >= 0: text=name.join(text.split(re))
+         return text
+ 
+     errQuote__roles__=()
+@@ -293,7 +226,7 @@
+     manage_editForm__roles__=()
+     def manage_editForm(self, URL1, REQUEST):
+         '''Display doc template editing form''' #"
+-        
++
+         return self._manage_editForm(
+             self,
+             mapping=REQUEST,
+@@ -319,7 +252,7 @@
+     def manage_edit(self,data,PARENTS,URL1,REQUEST):
+         'edit a template'
+         newHTML=self.copy_class(data,self.globals,self.__name__)
+-        setattr(PARENTS[1],URL1[rfind(URL1,'/')+1:],newHTML)
++        setattr(PARENTS[1],URL1[URL1.rfind('/')+1:],newHTML)
+         return self.editConfirmation(self,REQUEST)
+ 
+ 
+@@ -367,10 +300,10 @@
+                     PARENTS=[],URL1='',URL2='',REQUEST='', SUBMIT=''):
+         'edit a template'
+         if SUBMIT==FactoryDefaultString: return self.manage_default(REQUEST)
+-        if find(data,'\r'):
+-            data=join(split(data,'\r\n'),'\n\r')
+-            data=join(split(data,'\n\r'),'\n')
+-            
++        if data.find('\r'):
++            data='\n\r'.join(data.split('\r\n'))
++            data='\n'.join(data.split('\n\r'))
++
+         if self.edited_source:
+             self.edited_source=data
+             self._v_cooked=self.cook()
+@@ -379,5 +312,5 @@
+             newHTML=self.__class__()
+             newHTML.__setstate__(self.__getstate__())
+             newHTML.edited_source=data
+-            setattr(PARENTS[1],URL1[rfind(URL1,'/')+1:],newHTML)
++            setattr(PARENTS[1],URL1[URL1.rfind('/')+1:],newHTML)
+         if REQUEST: return self.editConfirmation(self,REQUEST)
+diff -ur qm-2.3.vanilla/qm/external/DocumentTemplate/DT_In.py qm-2.3/qm/external/DocumentTemplate/DT_In.py
+--- qm-2.3.vanilla/qm/external/DocumentTemplate/DT_In.py	2005-02-11 17:11:16.000000000 +0100
++++ qm-2.3/qm/external/DocumentTemplate/DT_In.py	2007-07-23 22:13:09.000000000 +0200
+@@ -387,8 +387,7 @@
+ 
+ from DT_Util import ParseError, parse_params, name_param, str
+ from DT_Util import render_blocks, InstanceDict, ValidationError, VSEval, expr_globals
+-from string import find, atoi, join, split
+-import ts_regex
++import re
+ from DT_InSV import sequence_variables, opt
+ TupleType=type(())
+ 
+@@ -449,11 +448,11 @@
+         if has_key('start'):
+             v=args['start']
+             if type(v)==type(''):
+-                try: atoi(v)
++                try: int(v)
+                 except:
+-                    self.start_name_re=ts_regex.compile(
++                    self.start_name_re=re.compile(
+                         '&+'+
+-                        join(map(lambda c: "[%s]" % c, v),'')+
++                        ''.join(["[%s]" % c for c in v])+
+                         '=[0-9]+&+')
+                     
+         name,expr=name_param(args,'in',1)
+@@ -628,7 +627,7 @@
+                     if index==first: kw['sequence-start']=0
+ 
+ 
+-                result=join(result, '')
++                result=''.join(result)
+ 
+         finally:
+             if cache: pop()
+@@ -712,7 +711,7 @@
+                     finally: pop()
+                     if index==0: kw['sequence-start']=0
+ 
+-                result=join(result, '')
++                result=''.join(result)
+ 
+         finally:
+             if cache: pop()
+@@ -727,7 +726,7 @@
+         # eg <dtml in "foo" sort=akey,anotherkey>
+         
+         sort=self.sort
+-        sortfields = split(sort,',')   # multi sort = key1,key2 
++        sortfields = sort.split(',')   # multi sort = key1,key2 
+         multsort = len(sortfields) > 1 # flag: is multiple sort
+         mapping=self.mapping
+         isort=not sort
+@@ -784,8 +783,8 @@
+     try: v=params[name]
+     except: v=default
+     if v:
+-        try: v=atoi(v)
++        try: v=int(v)
+         except:
+             v=md[v]
+-            if type(v) is st: v=atoi(v)
++            if type(v) is st: v=int(v)
+     return v
+diff -ur qm-2.3.vanilla/qm/external/DocumentTemplate/DT_Let.py qm-2.3/qm/external/DocumentTemplate/DT_Let.py
+--- qm-2.3.vanilla/qm/external/DocumentTemplate/DT_Let.py	2005-02-11 17:11:16.000000000 +0100
++++ qm-2.3/qm/external/DocumentTemplate/DT_Let.py	2007-07-23 22:13:38.000000000 +0200
+@@ -1,92 +1,20 @@
+ ##############################################################################
+-# 
+-# Zope Public License (ZPL) Version 1.0
+-# -------------------------------------
+-# 
+-# Copyright (c) Digital Creations.  All rights reserved.
+-# 
+-# This license has been certified as Open Source(tm).
+-# 
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are
+-# met:
+-# 
+-# 1. Redistributions in source code must retain the above copyright
+-#    notice, this list of conditions, and the following disclaimer.
+-# 
+-# 2. Redistributions in binary form must reproduce the above copyright
+-#    notice, this list of conditions, and the following disclaimer in
+-#    the documentation and/or other materials provided with the
+-#    distribution.
+-# 
+-# 3. Digital Creations requests that attribution be given to Zope
+-#    in any manner possible. Zope includes a "Powered by Zope"
+-#    button that is installed by default. While it is not a license
+-#    violation to remove this button, it is requested that the
+-#    attribution remain. A significant investment has been put
+-#    into Zope, and this effort will continue if the Zope community
+-#    continues to grow. This is one way to assure that growth.
+-# 
+-# 4. All advertising materials and documentation mentioning
+-#    features derived from or use of this software must display
+-#    the following acknowledgement:
+-# 
+-#      "This product includes software developed by Digital Creations
+-#      for use in the Z Object Publishing Environment
+-#      (http://www.zope.org/)."
+-# 
+-#    In the event that the product being advertised includes an
+-#    intact Zope distribution (with copyright and license included)
+-#    then this clause is waived.
+-# 
+-# 5. Names associated with Zope or Digital Creations must not be used to
+-#    endorse or promote products derived from this software without
+-#    prior written permission from Digital Creations.
+-# 
+-# 6. Modified redistributions of any form whatsoever must retain
+-#    the following acknowledgment:
+-# 
+-#      "This product includes software developed by Digital Creations
+-#      for use in the Z Object Publishing Environment
+-#      (http://www.zope.org/)."
+-# 
+-#    Intact (re-)distributions of any official Zope release do not
+-#    require an external acknowledgement.
+-# 
+-# 7. Modifications are encouraged but must be packaged separately as
+-#    patches to official Zope releases.  Distributions that do not
+-#    clearly separate the patches from the original work must be clearly
+-#    labeled as unofficial distributions.  Modifications which do not
+-#    carry the name Zope may be packaged in any form, as long as they
+-#    conform to all of the clauses above.
+-# 
+-# 
+-# Disclaimer
+-# 
+-#   THIS SOFTWARE IS PROVIDED BY DIGITAL CREATIONS ``AS IS'' AND ANY
+-#   EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-#   PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL DIGITAL CREATIONS OR ITS
+-#   CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-#   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-#   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+-#   USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+-#   ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-#   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+-#   OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+-#   SUCH DAMAGE.
+-# 
+-# 
+-# This software consists of contributions made by Digital Creations and
+-# many individuals on behalf of Digital Creations.  Specific
+-# attributions are listed in the accompanying credits file.
+-# 
++#
++# Copyright (c) 2002 Zope Corporation and Contributors. All Rights Reserved.
++#
++# This software is subject to the provisions of the Zope Public License,
++# Version 2.1 (ZPL).  A copy of the ZPL should accompany this distribution.
++# THIS SOFTWARE IS PROVIDED "AS IS" AND ANY AND ALL EXPRESS OR IMPLIED
++# WARRANTIES ARE DISCLAIMED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF TITLE, MERCHANTABILITY, AGAINST INFRINGEMENT, AND FITNESS
++# FOR A PARTICULAR PURPOSE
++#
+ ##############################################################################
+ 
+ ''' The Let tag was contributed to Zope by and is copyright, 1999
+     Phillip J. Eby.  Permission has been granted to release the Let tag
+     under the Zope Public License.
+-    
++
+ 
+    Let name=value...
+ 
+@@ -110,16 +38,17 @@
+    Variables are processed in sequence, so later assignments can
+    reference and/or overwrite the results of previous assignments,
+    as desired.
+-''' 
++'''
+ 
+-from DT_Util import render_blocks, Eval, expr_globals, ParseError, regex, strip
++from DT_Util import render_blocks, Eval, ParseError
+ from DT_Util import str # Probably needed due to hysterical pickles.
++import re
+ 
+ 
+ class Let:
+     blockContinuations=()
+     name='let'
+-    
++
+     def __init__(self, blocks):
+         tname, args, section = blocks[0]
+         self.__name__ = args
+@@ -131,7 +60,7 @@
+             if expr[:1]=='"' and expr[-1:]=='"' and len(expr) > 1:
+ 				# expr shorthand
+                 expr=expr[1:-1]
+-                try: args[i] = name, Eval(expr, expr_globals).eval
++                try: args[i] = name, Eval(expr).eval
+                 except SyntaxError, v:
+                     m,(huh,l,c,src) = v
+                     raise ParseError, (
+@@ -149,32 +78,33 @@
+ 
+     __call__ = render
+ 
++
+ def parse_let_params(text,
+             result=None,
+             tag='let',
+-            parmre=regex.compile(
+-                '\([\0- ]*\([^\0- =\"]+\)=\([^\0- =\"]+\)\)'),
+-            qparmre=regex.compile(
+-                '\([\0- ]*\([^\0- =\"]+\)="\([^"]*\)\"\)'),
++            parmre=re.compile('([\000- ]*([^\000- ="]+)=([^\000- ="]+))'),
++            qparmre=re.compile('([\000- ]*([^\000- ="]+)="([^"]*)")'),
+             **parms):
+ 
+     result=result or []
+ 
+-    if parmre.match(text) >= 0:
+-        name=parmre.group(2)
+-        value=parmre.group(3)
+-        l=len(parmre.group(1))
+-    elif qparmre.match(text) >= 0:
+-        name=qparmre.group(2)
+-        value='"%s"' % qparmre.group(3)
+-        l=len(qparmre.group(1))
++    mo = parmre.match(text)
++    mo1= qparmre.match(text)
++
++    if mo is not None:
++        name=mo.group(2)
++        value=mo.group(3)
++        l=len(mo.group(1))
++    elif mo1 is not None:
++        name=mo1.group(2)
++        value='"%s"' % mo1.group(3)
++        l=len(mo1.group(1))
+     else:
+-        if not text or not strip(text): return result
++        if not text or not text.strip(): return result
+         raise ParseError, ('invalid parameter: "%s"' % text, tag)
+-    
++
+     result.append((name,value))
+ 
+-    text=strip(text[l:])
+-    if text: return apply(parse_let_params,(text,result,tag),parms)
++    text=text[l:].strip()
++    if text: return parse_let_params(text,result,tag,**parms)
+     else: return result
+-
+Only in qm-2.3/qm/external/DocumentTemplate: DT_Let.py.orig
+Only in qm-2.3/qm/external/DocumentTemplate: DT_Let.py.rej
+Only in qm-2.3/qm/external/DocumentTemplate: DT_Let.py~
+diff -ur qm-2.3.vanilla/qm/external/DocumentTemplate/DT_Return.py qm-2.3/qm/external/DocumentTemplate/DT_Return.py
+--- qm-2.3.vanilla/qm/external/DocumentTemplate/DT_Return.py	2005-02-11 17:11:16.000000000 +0100
++++ qm-2.3/qm/external/DocumentTemplate/DT_Return.py	2007-07-23 22:13:09.000000000 +0200
+@@ -85,7 +85,7 @@
+ __version__='$Revision$'[11:-2]
+ 
+ from DT_Util import parse_params, name_param, html_quote, str
+-import regex, string, sys, regex
++import string, sys
+ from string import find, split, join, atoi, rfind
+ 
+ class ReturnTag: 
+diff -ur qm-2.3.vanilla/qm/external/DocumentTemplate/DT_String.py qm-2.3/qm/external/DocumentTemplate/DT_String.py
+--- qm-2.3.vanilla/qm/external/DocumentTemplate/DT_String.py	2005-02-11 17:11:16.000000000 +0100
++++ qm-2.3/qm/external/DocumentTemplate/DT_String.py	2007-07-23 22:13:09.000000000 +0200
+@@ -1,91 +1,20 @@
+ ##############################################################################
+-# 
+-# Zope Public License (ZPL) Version 1.0
+-# -------------------------------------
+-# 
+-# Copyright (c) Digital Creations.  All rights reserved.
+-# 
+-# This license has been certified as Open Source(tm).
+-# 
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are
+-# met:
+-# 
+-# 1. Redistributions in source code must retain the above copyright
+-#    notice, this list of conditions, and the following disclaimer.
+-# 
+-# 2. Redistributions in binary form must reproduce the above copyright
+-#    notice, this list of conditions, and the following disclaimer in
+-#    the documentation and/or other materials provided with the
+-#    distribution.
+-# 
+-# 3. Digital Creations requests that attribution be given to Zope
+-#    in any manner possible. Zope includes a "Powered by Zope"
+-#    button that is installed by default. While it is not a license
+-#    violation to remove this button, it is requested that the
+-#    attribution remain. A significant investment has been put
+-#    into Zope, and this effort will continue if the Zope community
+-#    continues to grow. This is one way to assure that growth.
+-# 
+-# 4. All advertising materials and documentation mentioning
+-#    features derived from or use of this software must display
+-#    the following acknowledgement:
+-# 
+-#      "This product includes software developed by Digital Creations
+-#      for use in the Z Object Publishing Environment
+-#      (http://www.zope.org/)."
+-# 
+-#    In the event that the product being advertised includes an
+-#    intact Zope distribution (with copyright and license included)
+-#    then this clause is waived.
+-# 
+-# 5. Names associated with Zope or Digital Creations must not be used to
+-#    endorse or promote products derived from this software without
+-#    prior written permission from Digital Creations.
+-# 
+-# 6. Modified redistributions of any form whatsoever must retain
+-#    the following acknowledgment:
+-# 
+-#      "This product includes software developed by Digital Creations
+-#      for use in the Z Object Publishing Environment
+-#      (http://www.zope.org/)."
+-# 
+-#    Intact (re-)distributions of any official Zope release do not
+-#    require an external acknowledgement.
+-# 
+-# 7. Modifications are encouraged but must be packaged separately as
+-#    patches to official Zope releases.  Distributions that do not
+-#    clearly separate the patches from the original work must be clearly
+-#    labeled as unofficial distributions.  Modifications which do not
+-#    carry the name Zope may be packaged in any form, as long as they
+-#    conform to all of the clauses above.
+-# 
+-# 
+-# Disclaimer
+-# 
+-#   THIS SOFTWARE IS PROVIDED BY DIGITAL CREATIONS ``AS IS'' AND ANY
+-#   EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-#   PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL DIGITAL CREATIONS OR ITS
+-#   CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-#   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-#   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+-#   USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+-#   ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-#   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+-#   OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+-#   SUCH DAMAGE.
+-# 
+-# 
+-# This software consists of contributions made by Digital Creations and
+-# many individuals on behalf of Digital Creations.  Specific
+-# attributions are listed in the accompanying credits file.
+-# 
++#
++# Copyright (c) 2002 Zope Corporation and Contributors. All Rights Reserved.
++#
++# This software is subject to the provisions of the Zope Public License,
++# Version 2.1 (ZPL).  A copy of the ZPL should accompany this distribution.
++# THIS SOFTWARE IS PROVIDED "AS IS" AND ANY AND ALL EXPRESS OR IMPLIED
++# WARRANTIES ARE DISCLAIMED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF TITLE, MERCHANTABILITY, AGAINST INFRINGEMENT, AND FITNESS
++# FOR A PARTICULAR PURPOSE
++#
+ ##############################################################################
+ "$Id$"
+ 
+-from string import split, strip
+-import regex, ts_regex
++import os
++import thread
++import re
+ 
+ from DT_Util import ParseError, InstanceDict, TemplateDict, render_blocks, str
+ from DT_Var import Var, Call, Comment
+@@ -109,7 +38,7 @@
+         %(name)s
+       %(in results)]
+ 
+-    """ 
++    """
+ 
+     isDocTemp=1
+ 
+@@ -119,7 +48,7 @@
+     func_code.co_varnames='self','REQUEST'
+     func_code.co_argcount=2
+     func_code.__roles__=()
+-    
++
+     func_defaults__roles__=()
+     func_defaults=()
+ 
+@@ -128,8 +57,8 @@
+ 
+     parse_error__roles__=()
+     def parse_error(self, mess, tag, text, start):
+-        raise ParseError, "%s, for tag %s, on line %s of %s<p>" % (
+-            mess, self.errQuote(tag), len(split(text[:start],'\n')),
++        raise ParseError, "%s, for tag %s, on line %s of %s" % (
++            mess, self.errQuote(tag), len(text[:start].split('\n')),
+             self.errQuote(self.__name__))
+ 
+     commands__roles__=()
+@@ -154,35 +83,32 @@
+ 
+     tagre__roles__=()
+     def tagre(self):
+-        return regex.symcomp(
+-            '%('                                     # beginning
+-            '\(<name>[a-zA-Z0-9_/.-]+\)'                       # tag name
+-            '\('
+-            '[\0- ]+'                                # space after tag name
+-            '\(<args>\([^)"]+\("[^"]*"\)?\)*\)'      # arguments
+-            '\)?'
+-            ')\(<fmt>[0-9]*[.]?[0-9]*[a-z]\|[]![]\)' # end
+-            , regex.casefold) 
++        return re.compile(
++            '%\\('                                  # beginning
++            '(?P<name>[a-zA-Z0-9_/.-]+)'              # tag name
++            '('
++            '[\000- ]+'                             # space after tag name
++            '(?P<args>([^\\)"]+("[^"]*")?)*)'         # arguments
++            ')?'
++            '\\)(?P<fmt>[0-9]*[.]?[0-9]*[a-z]|[]![])' # end
++            , re.I)
+ 
+     _parseTag__roles__=()
+-    def _parseTag(self, tagre, command=None, sargs='', tt=type(())):
+-        tag, args, command, coname = self.parseTag(tagre,command,sargs)
++    def _parseTag(self, match_ob, command=None, sargs='', tt=type(())):
++        tag, args, command, coname = self.parseTag(match_ob,command,sargs)
+         if type(command) is tt:
+             cname, module, name = command
+             d={}
+-            # Subtlety: in these calls, globals() is not modified, but it
+-            # provides module context for the import statement (so it knows
+-            # to check the same directory as this file was found in).
+             try:
+-                exec 'from %s import %s' % (module, name) in globals(), d
++                exec 'from %s import %s' % (module, name) in d
+             except ImportError:
+-                exec 'from DocumentTemplate.%s import %s' % (module, name) in globals(), d
++                exec 'from DocumentTemplate.%s import %s' % (module, name) in d
+             command=d[name]
+             self.commands[cname]=command
+         return tag, args, command, coname
+ 
+     parseTag__roles__=()
+-    def parseTag(self, tagre, command=None, sargs=''):
++    def parseTag(self, match_ob, command=None, sargs=''):
+         """Parse a tag using an already matched re
+ 
+         Return: tag, args, command, coname
+@@ -194,8 +120,8 @@
+                coname is the name of a continue tag (e.g. else)
+                  or None otherwise
+         """
+-        tag, name, args, fmt =tagre.group(0, 'name', 'args', 'fmt')
+-        args=args and strip(args) or ''
++        tag, name, args, fmt = match_ob.group(0, 'name', 'args', 'fmt')
++        args=args and args.strip() or ''
+ 
+         if fmt==']':
+             if not command or name != command.name:
+@@ -223,17 +149,18 @@
+             return tag, args, Var, None
+ 
+     varExtra__roles__=()
+-    def varExtra(self,tagre):
+-        return tagre.group('fmt')
++    def varExtra(self, match_ob):
++        return match_ob.group('fmt')
+ 
+     parse__roles__=()
+     def parse(self,text,start=0,result=None,tagre=None):
+         if result is None: result=[]
+         if tagre is None: tagre=self.tagre()
+-        l=tagre.search(text,start)
+-        while l >= 0:
++        mo = tagre.search(text,start)
++        while mo :
++            l = mo.start(0)
+ 
+-            try: tag, args, command, coname = self._parseTag(tagre)
++            try: tag, args, command, coname = self._parseTag(mo)
+             except ParseError, m: self.parse_error(m[0],m[1],text,l)
+ 
+             s=text[start:l]
+@@ -245,23 +172,25 @@
+                                        tag, l, args, command)
+             else:
+                 try:
+-                    if command is Var: r=command(args, self.varExtra(tagre))
++                    if command is Var: r=command(args, self.varExtra(mo))
+                     else: r=command(args)
+                     if hasattr(r,'simple_form'): r=r.simple_form
+                     result.append(r)
+                 except ParseError, m: self.parse_error(m[0],tag,text,l)
+ 
+-            l=tagre.search(text,start)
++            mo = tagre.search(text,start)
+ 
+         text=text[start:]
+         if text: result.append(text)
+         return result
+ 
+     skip_eol__roles__=()
+-    def skip_eol(self, text, start, eol=regex.compile('[ \t]*\n')):
++    def skip_eol(self, text, start, eol=re.compile('[ \t]*\n')):
+         # if block open is followed by newline, then skip past newline
+-        l=eol.match(text,start)
+-        if l > 0: start=start+l
++        mo =eol.match(text,start)
++        if mo is not None:
++            start = start + mo.end(0) - mo.start(0)
++
+         return start
+ 
+     parse_block__roles__=()
+@@ -277,12 +206,13 @@
+         sa=sargs
+         while 1:
+ 
+-            l=tagre.search(text,start)
+-            if l < 0: self.parse_error('No closing tag', stag, text, sloc)
++            mo = tagre.search(text,start)
++            if mo is None: self.parse_error('No closing tag', stag, text, sloc)
++            l = mo.start(0)
+ 
+-            try: tag, args, command, coname= self._parseTag(tagre,scommand,sa)
++            try: tag, args, command, coname= self._parseTag(mo,scommand,sa)
+             except ParseError, m: self.parse_error(m[0],m[1], text, l)
+-            
++
+             if command:
+                 start=l+len(tag)
+                 if hasattr(command, 'blockContinuations'):
+@@ -295,7 +225,7 @@
+                 section._v_blocks=section.blocks=self.parse(text[:l],sstart)
+                 section._v_cooked=None
+                 blocks.append((tname,sargs,section))
+-    
++
+                 start=self.skip_eol(text,l+len(tag))
+ 
+                 if coname:
+@@ -315,10 +245,11 @@
+     parse_close__roles__=()
+     def parse_close(self, text, start, tagre, stag, sloc, scommand, sa):
+         while 1:
+-            l=tagre.search(text,start)
+-            if l < 0: self.parse_error('No closing tag', stag, text, sloc)
++            mo = tagre.search(text,start)
++            if mo is None: self.parse_error('No closing tag', stag, text, sloc)
++            l = mo.start(0)
+ 
+-            try: tag, args, command, coname= self._parseTag(tagre,scommand,sa)
++            try: tag, args, command, coname= self._parseTag(mo,scommand,sa)
+             except ParseError, m: self.parse_error(m[0],m[1], text, l)
+ 
+             start=l+len(tag)
+@@ -386,7 +317,7 @@
+         """
+         if mapping is not None or vars:
+             self.initvars(mapping, vars)
+-        if source_string is not None: 
++        if source_string is not None:
+             self.raw=source_string
+         self.cook()
+ 
+@@ -404,7 +335,7 @@
+ 
+     cook__roles__=()
+     def cook(self,
+-             cooklock=ts_regex.allocate_lock(),
++             cooklock=thread.allocate_lock(),
+              ):
+         cooklock.acquire()
+         try:
+@@ -442,13 +373,13 @@
+         containing values to be looked up.  Values will be looked up
+         using getattr, so inheritence of values is supported.  Note
+         that names beginning with '_' will not be looked up from the
+-        client. 
++        client.
+ 
+         The optional argument, 'mapping' is used to specify a mapping
+         object containing values to be inserted.
+ 
+         Values to be inserted may also be specified using keyword
+-        arguments. 
++        arguments.
+ 
+         Values will be inserted from one of several sources.  The
+         sources, in the order in which they are consulted, are:
+@@ -463,7 +394,7 @@
+              created, and
+ 
+           o  The 'mapping' argument provided when the template was
+-             created. 
++             created.
+ 
+         '''
+         # print '============================================================'
+@@ -526,8 +457,8 @@
+                 # otherwise its just a normal client object.
+                 push(InstanceDict(client, md)) # Circ. Ref. 8-|
+                 pushed=pushed+1
+-                
+-        if self._vars: 
++
++        if self._vars:
+             push(self._vars)
+             pushed=pushed+1
+ 
+@@ -565,7 +496,7 @@
+ class FileMixin:
+     # Mix-in class to abstract certain file-related attributes
+     edited_source=''
+-    
++
+     def __init__(self, file_name='', mapping=None, __name__='', **vars):
+         """\
+         Create a document template based on a named file.
+diff -ur qm-2.3.vanilla/qm/external/DocumentTemplate/DT_Util.py qm-2.3/qm/external/DocumentTemplate/DT_Util.py
+--- qm-2.3.vanilla/qm/external/DocumentTemplate/DT_Util.py	2005-02-14 08:01:54.000000000 +0100
++++ qm-2.3/qm/external/DocumentTemplate/DT_Util.py	2007-07-23 22:13:09.000000000 +0200
+@@ -1,92 +1,20 @@
+ ##############################################################################
+-# 
+-# Zope Public License (ZPL) Version 1.0
+-# -------------------------------------
+-# 
+-# Copyright (c) Digital Creations.  All rights reserved.
+-# 
+-# This license has been certified as Open Source(tm).
+-# 
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are
+-# met:
+-# 
+-# 1. Redistributions in source code must retain the above copyright
+-#    notice, this list of conditions, and the following disclaimer.
+-# 
+-# 2. Redistributions in binary form must reproduce the above copyright
+-#    notice, this list of conditions, and the following disclaimer in
+-#    the documentation and/or other materials provided with the
+-#    distribution.
+-# 
+-# 3. Digital Creations requests that attribution be given to Zope
+-#    in any manner possible. Zope includes a "Powered by Zope"
+-#    button that is installed by default. While it is not a license
+-#    violation to remove this button, it is requested that the
+-#    attribution remain. A significant investment has been put
+-#    into Zope, and this effort will continue if the Zope community
+-#    continues to grow. This is one way to assure that growth.
+-# 
+-# 4. All advertising materials and documentation mentioning
+-#    features derived from or use of this software must display
+-#    the following acknowledgement:
+-# 
+-#      "This product includes software developed by Digital Creations
+-#      for use in the Z Object Publishing Environment
+-#      (http://www.zope.org/)."
+-# 
+-#    In the event that the product being advertised includes an
+-#    intact Zope distribution (with copyright and license included)
+-#    then this clause is waived.
+-# 
+-# 5. Names associated with Zope or Digital Creations must not be used to
+-#    endorse or promote products derived from this software without
+-#    prior written permission from Digital Creations.
+-# 
+-# 6. Modified redistributions of any form whatsoever must retain
+-#    the following acknowledgment:
+-# 
+-#      "This product includes software developed by Digital Creations
+-#      for use in the Z Object Publishing Environment
+-#      (http://www.zope.org/)."
+-# 
+-#    Intact (re-)distributions of any official Zope release do not
+-#    require an external acknowledgement.
+-# 
+-# 7. Modifications are encouraged but must be packaged separately as
+-#    patches to official Zope releases.  Distributions that do not
+-#    clearly separate the patches from the original work must be clearly
+-#    labeled as unofficial distributions.  Modifications which do not
+-#    carry the name Zope may be packaged in any form, as long as they
+-#    conform to all of the clauses above.
+-# 
+-# 
+-# Disclaimer
+-# 
+-#   THIS SOFTWARE IS PROVIDED BY DIGITAL CREATIONS ``AS IS'' AND ANY
+-#   EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-#   PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL DIGITAL CREATIONS OR ITS
+-#   CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-#   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-#   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+-#   USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+-#   ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-#   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+-#   OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+-#   SUCH DAMAGE.
+-# 
+-# 
+-# This software consists of contributions made by Digital Creations and
+-# many individuals on behalf of Digital Creations.  Specific
+-# attributions are listed in the accompanying credits file.
+-# 
++#
++# Copyright (c) 2002 Zope Corporation and Contributors. All Rights Reserved.
++#
++# This software is subject to the provisions of the Zope Public License,
++# Version 2.1 (ZPL).  A copy of the ZPL should accompany this distribution.
++# THIS SOFTWARE IS PROVIDED "AS IS" AND ANY AND ALL EXPRESS OR IMPLIED
++# WARRANTIES ARE DISCLAIMED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF TITLE, MERCHANTABILITY, AGAINST INFRINGEMENT, AND FITNESS
++# FOR A PARTICULAR PURPOSE
++#
+ ##############################################################################
+-'''$Id$''' 
+-__version__='$Revision$'[11:-2]
+-
+-import regex, string, math, os
+-from string import strip, join, atoi, lower, split, find
++"""DTML Utilities
++  
++$Id$"""
++ 
++import re
+ import VSEval
+ 
+ str=__builtins__['str'] # Waaaaa, waaaaaaaa needed for pickling waaaaa
+@@ -103,17 +31,18 @@
+                        (('"'),    '&quot;'))): #"
+         text=str(v)
+         for re,name in character_entities:
+-            if find(text, re) >= 0: text=join(split(text,re),name)
++            if text.find(re) >= 0: text=text.split(re).join(name)
+         return text
+ 
+ def int_param(params,md,name,default=0, st=type('')):
+-    try: v=params[name]
+-    except: v=default
++    v = params.get(name, default)
+     if v:
+-        try: v=atoi(v)
++        try:
++            v = int(v)
+         except:
+-            v=md[v]
+-            if type(v) is st: v=atoi(v)
++            v = md[v]
++            if isinstance(v, str):
++                v = int(v)
+     return v or 0
+ 
+ _marker=[]
+@@ -449,14 +378,10 @@
+ def parse_params(text,
+                  result=None,
+                  tag='',
+-                 unparmre=regex.compile(
+-                     '\([\0- ]*\([^\0- =\"]+\)\)'),
+-                 qunparmre=regex.compile(
+-                     '\([\0- ]*\("[^"]*"\)\)'),
+-                 parmre=regex.compile(
+-                     '\([\0- ]*\([^\0- =\"]+\)=\([^\0- =\"]+\)\)'),
+-                 qparmre=regex.compile(
+-                     '\([\0- ]*\([^\0- =\"]+\)="\([^"]*\)\"\)'),
++                 unparmre=re.compile('([\000- ]*([^\000- ="]+))'),
++                 qunparmre=re.compile('([\000- ]*("[^"]*"))'),
++                 parmre=re.compile('([\000- ]*([^\000- ="]+)=([^\000- ="]+))'),
++                 qparmre=re.compile('([\000- ]*([^\000- ="]+)="([^"]*)")'),
+                  **parms):
+ 
+     """Parse tag parameters
+@@ -482,39 +407,47 @@
+ 
+     result=result or {}
+ 
+-    if parmre.match(text) >= 0:
+-        name=lower(parmre.group(2))
+-        value=parmre.group(3)
+-        l=len(parmre.group(1))
+-    elif qparmre.match(text) >= 0:
+-        name=lower(qparmre.group(2))
+-        value=qparmre.group(3)
+-        l=len(qparmre.group(1))
+-    elif unparmre.match(text) >= 0:
+-        name=unparmre.group(2)
+-        l=len(unparmre.group(1))
++    # HACK - we precalculate all matches. Maybe we don't need them
++    # all. This should be fixed for performance issues
++
++    mo_p = parmre.match(text)
++    mo_q = qparmre.match(text)
++    mo_unp = unparmre.match(text)
++    mo_unq = qunparmre.match(text)
++
++    if mo_p:
++        name=mo_p.group(2).lower()
++        value=mo_p.group(3)
++        l=len(mo_p.group(1))
++    elif mo_q:
++        name=mo_q.group(2).lower()
++        value=mo_q.group(3)
++        l=len(mo_q.group(1))
++    elif mo_unp:
++        name=mo_unp.group(2)
++        l=len(mo_unp.group(1))
+         if result:
+             if parms.has_key(name):
+                 if parms[name] is None: raise ParseError, (
+                     'Attribute %s requires a value' % name, tag)
+-                    
++
+                 result[name]=parms[name]
+             else: raise ParseError, (
+                 'Invalid attribute name, "%s"' % name, tag)
+         else:
+             result['']=name
+-        return apply(parse_params,(text[l:],result),parms)
+-    elif qunparmre.match(text) >= 0:
+-        name=qunparmre.group(2)
+-        l=len(qunparmre.group(1))
++        return parse_params(text[l:],result,**parms)
++    elif mo_unq:
++        name=mo_unq.group(2)
++        l=len(mo_unq.group(1))
+         if result: raise ParseError, (
+             'Invalid attribute name, "%s"' % name, tag)
+         else: result['']=name
+-        return apply(parse_params,(text[l:],result),parms)
++        return parse_params(text[l:],result,**parms)
+     else:
+-        if not text or not strip(text): return result
++        if not text or not text.strip(): return result
+         raise ParseError, ('invalid parameter: "%s"' % text, tag)
+-    
++
+     if not parms.has_key(name):
+         raise ParseError, (
+             'Invalid attribute name, "%s"' % name, tag)
+@@ -524,9 +457,9 @@
+         if type(p) is not ListType or p:
+             raise ParseError, (
+                 'Duplicate values for attribute "%s"' % name, tag)
+-            
++
+     result[name]=value
+ 
+-    text=strip(text[l:])
+-    if text: return apply(parse_params,(text,result),parms)
++    text=text[l:].strip()
++    if text: return parse_params(text,result,**parms)
+     else: return result
+diff -ur qm-2.3.vanilla/qm/external/DocumentTemplate/DT_Var.py qm-2.3/qm/external/DocumentTemplate/DT_Var.py
+--- qm-2.3.vanilla/qm/external/DocumentTemplate/DT_Var.py	2005-02-11 17:11:16.000000000 +0100
++++ qm-2.3/qm/external/DocumentTemplate/DT_Var.py	2007-07-23 22:13:09.000000000 +0200
+@@ -221,8 +221,7 @@
+ __version__='$Revision$'[11:-2]
+ 
+ from DT_Util import parse_params, name_param, html_quote, str
+-import regex, string, sys, regex
+-from string import find, split, join, atoi, rfind
++import string, re, sys
+ from urllib import quote, quote_plus
+ 
+ class Var: 
+@@ -322,13 +321,13 @@
+ 
+         if have_arg('size'):
+             size=args['size']
+-            try: size=atoi(size)
++            try: size=int(size)
+             except: raise 'Document Error',(
+                 '''a <code>size</code> attribute was used in a <code>var</code>
+                 tag with a non-integer value.''')
+             if len(val) > size:
+                 val=val[:size]
+-                l=rfind(val,' ')
++                l=val.rfind(' ')
+                 if l > size/2:
+                     val=val[:l+1]
+                 if have_arg('etc'): l=args['etc']
+@@ -360,8 +359,8 @@
+ 
+ def newline_to_br(v, name='(Unknown name)', md={}):
+     v=str(v)
+-    if find(v,'\r') >= 0: v=join(split(v,'\r'),'')
+-    if find(v,'\n') >= 0: v=join(split(v,'\n'),'<br>\n')
++    if v.find('\r') >= 0: v=''.join(v.split('\r'))
++    if v.find('\n') >= 0: v='<br />\n'.join(v.split('\n'))
+     return v
+ 
+ def whole_dollars(v, name='(Unknown name)', md={}):
+@@ -373,19 +372,20 @@
+     except: return ''
+ 
+ def thousands_commas(v, name='(Unknown name)', md={},
+-                     thou=regex.compile(
+-                         "\([0-9]\)\([0-9][0-9][0-9]\([,.]\|$\)\)").search):
++                     thou=re.compile(
++                         r"([0-9])([0-9][0-9][0-9]([,.]|$))").search):
+     v=str(v)
+-    vl=split(v,'.')
++    vl=v.split('.')
+     if not vl: return v
+     v=vl[0]
+     del vl[0]
+-    if vl: s='.'+join(vl,'.')
++    if vl: s='.'+'.'.join(vl)
+     else: s=''
+-    l=thou(v)
+-    while l >= 0:
++    mo=thou(v)
++    while mo is not None:
++        l = mo.start(0)
+         v=v[:l+1]+','+v[l+1:]
+-        l=thou(v)
++        mo=thou(v)
+     return v+s
+     
+ def whole_dollars_with_commas(v, name='(Unknown name)', md={}):
+@@ -416,7 +416,7 @@
+     This is needed to securely insert values into sql
+     string literals in templates that generate sql.
+     """
+-    if find(v,"'") >= 0: return join(split(v,"'"),"''")
++    if v.find("'") >= 0: return v.replace("'", "''")
+     return v
+ 
+ special_formats={
+@@ -437,7 +437,7 @@
+     }
+ 
+ def spacify(val):
+-    if find(val,'_') >= 0: val=join(split(val,'_'))
++    if val.find('_') >= 0: val=val.replace('_', ' ')
+     return val
+ 
+ modifiers=(html_quote, url_quote, url_quote_plus, newline_to_br,
+diff -ur qm-2.3.vanilla/qm/external/DocumentTemplate/__init__.py qm-2.3/qm/external/DocumentTemplate/__init__.py
+--- qm-2.3.vanilla/qm/external/DocumentTemplate/__init__.py	2005-02-11 17:11:16.000000000 +0100
++++ qm-2.3/qm/external/DocumentTemplate/__init__.py	2007-07-23 22:13:09.000000000 +0200
+@@ -1,86 +1,14 @@
+ ##############################################################################
+-# 
+-# Zope Public License (ZPL) Version 1.0
+-# -------------------------------------
+-# 
+-# Copyright (c) Digital Creations.  All rights reserved.
+-# 
+-# This license has been certified as Open Source(tm).
+-# 
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are
+-# met:
+-# 
+-# 1. Redistributions in source code must retain the above copyright
+-#    notice, this list of conditions, and the following disclaimer.
+-# 
+-# 2. Redistributions in binary form must reproduce the above copyright
+-#    notice, this list of conditions, and the following disclaimer in
+-#    the documentation and/or other materials provided with the
+-#    distribution.
+-# 
+-# 3. Digital Creations requests that attribution be given to Zope
+-#    in any manner possible. Zope includes a "Powered by Zope"
+-#    button that is installed by default. While it is not a license
+-#    violation to remove this button, it is requested that the
+-#    attribution remain. A significant investment has been put
+-#    into Zope, and this effort will continue if the Zope community
+-#    continues to grow. This is one way to assure that growth.
+-# 
+-# 4. All advertising materials and documentation mentioning
+-#    features derived from or use of this software must display
+-#    the following acknowledgement:
+-# 
+-#      "This product includes software developed by Digital Creations
+-#      for use in the Z Object Publishing Environment
+-#      (http://www.zope.org/)."
+-# 
+-#    In the event that the product being advertised includes an
+-#    intact Zope distribution (with copyright and license included)
+-#    then this clause is waived.
+-# 
+-# 5. Names associated with Zope or Digital Creations must not be used to
+-#    endorse or promote products derived from this software without
+-#    prior written permission from Digital Creations.
+-# 
+-# 6. Modified redistributions of any form whatsoever must retain
+-#    the following acknowledgment:
+-# 
+-#      "This product includes software developed by Digital Creations
+-#      for use in the Z Object Publishing Environment
+-#      (http://www.zope.org/)."
+-# 
+-#    Intact (re-)distributions of any official Zope release do not
+-#    require an external acknowledgement.
+-# 
+-# 7. Modifications are encouraged but must be packaged separately as
+-#    patches to official Zope releases.  Distributions that do not
+-#    clearly separate the patches from the original work must be clearly
+-#    labeled as unofficial distributions.  Modifications which do not
+-#    carry the name Zope may be packaged in any form, as long as they
+-#    conform to all of the clauses above.
+-# 
+-# 
+-# Disclaimer
+-# 
+-#   THIS SOFTWARE IS PROVIDED BY DIGITAL CREATIONS ``AS IS'' AND ANY
+-#   EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-#   PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL DIGITAL CREATIONS OR ITS
+-#   CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-#   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-#   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+-#   USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+-#   ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-#   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+-#   OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+-#   SUCH DAMAGE.
+-# 
+-# 
+-# This software consists of contributions made by Digital Creations and
+-# many individuals on behalf of Digital Creations.  Specific
+-# attributions are listed in the accompanying credits file.
+-# 
++#
++# Copyright (c) 2002 Zope Corporation and Contributors. All Rights Reserved.
++#
++# This software is subject to the provisions of the Zope Public License,
++# Version 2.1 (ZPL).  A copy of the ZPL should accompany this distribution.
++# THIS SOFTWARE IS PROVIDED "AS IS" AND ANY AND ALL EXPRESS OR IMPLIED
++# WARRANTIES ARE DISCLAIMED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
++# WARRANTIES OF TITLE, MERCHANTABILITY, AGAINST INFRINGEMENT, AND FITNESS
++# FOR A PARTICULAR PURPOSE
++#
+ ##############################################################################
+ __doc__='''Package wrapper for Document Template
+ 
+@@ -90,8 +18,4 @@
+ $Id$'''
+ __version__='$Revision$'[11:-2]
+ 
+-try:
+-    import ExtensionClass # work-around for import bug.
+-except ImportError: pass
+ from DocumentTemplate import String, File, HTML, HTMLDefault, HTMLFile
+-from DocumentTemplate import html_quote
+diff -ur qm-2.3.vanilla/qm/external/DocumentTemplate/ts_regex.py qm-2.3/qm/external/DocumentTemplate/ts_regex.py
+--- qm-2.3.vanilla/qm/external/DocumentTemplate/ts_regex.py	2005-02-11 17:11:16.000000000 +0100
++++ qm-2.3/qm/external/DocumentTemplate/ts_regex.py	2007-07-23 22:13:09.000000000 +0200
+@@ -1,215 +0,0 @@
+-##############################################################################
+-# 
+-# Zope Public License (ZPL) Version 1.0
+-# -------------------------------------
+-# 
+-# Copyright (c) Digital Creations.  All rights reserved.
+-# 
+-# This license has been certified as Open Source(tm).
+-# 
+-# Redistribution and use in source and binary forms, with or without
+-# modification, are permitted provided that the following conditions are
+-# met:
+-# 
+-# 1. Redistributions in source code must retain the above copyright
+-#    notice, this list of conditions, and the following disclaimer.
+-# 
+-# 2. Redistributions in binary form must reproduce the above copyright
+-#    notice, this list of conditions, and the following disclaimer in
+-#    the documentation and/or other materials provided with the
+-#    distribution.
+-# 
+-# 3. Digital Creations requests that attribution be given to Zope
+-#    in any manner possible. Zope includes a "Powered by Zope"
+-#    button that is installed by default. While it is not a license
+-#    violation to remove this button, it is requested that the
+-#    attribution remain. A significant investment has been put
+-#    into Zope, and this effort will continue if the Zope community
+-#    continues to grow. This is one way to assure that growth.
+-# 
+-# 4. All advertising materials and documentation mentioning
+-#    features derived from or use of this software must display
+-#    the following acknowledgement:
+-# 
+-#      "This product includes software developed by Digital Creations
+-#      for use in the Z Object Publishing Environment
+-#      (http://www.zope.org/)."
+-# 
+-#    In the event that the product being advertised includes an
+-#    intact Zope distribution (with copyright and license included)
+-#    then this clause is waived.
+-# 
+-# 5. Names associated with Zope or Digital Creations must not be used to
+-#    endorse or promote products derived from this software without
+-#    prior written permission from Digital Creations.
+-# 
+-# 6. Modified redistributions of any form whatsoever must retain
+-#    the following acknowledgment:
+-# 
+-#      "This product includes software developed by Digital Creations
+-#      for use in the Z Object Publishing Environment
+-#      (http://www.zope.org/)."
+-# 
+-#    Intact (re-)distributions of any official Zope release do not
+-#    require an external acknowledgement.
+-# 
+-# 7. Modifications are encouraged but must be packaged separately as
+-#    patches to official Zope releases.  Distributions that do not
+-#    clearly separate the patches from the original work must be clearly
+-#    labeled as unofficial distributions.  Modifications which do not
+-#    carry the name Zope may be packaged in any form, as long as they
+-#    conform to all of the clauses above.
+-# 
+-# 
+-# Disclaimer
+-# 
+-#   THIS SOFTWARE IS PROVIDED BY DIGITAL CREATIONS ``AS IS'' AND ANY
+-#   EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+-#   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+-#   PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL DIGITAL CREATIONS OR ITS
+-#   CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+-#   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+-#   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF
+-#   USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+-#   ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+-#   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
+-#   OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+-#   SUCH DAMAGE.
+-# 
+-# 
+-# This software consists of contributions made by Digital Creations and
+-# many individuals on behalf of Digital Creations.  Specific
+-# attributions are listed in the accompanying credits file.
+-# 
+-##############################################################################
+-"""Provide a thread-safe interface to regex
+-"""
+-import regex, regsub #, Sync
+-from regex import *
+-from regsub import split, sub, gsub, splitx, capwords
+-
+-try: 
+-    import thread
+-except:
+-    class allocate_lock:
+-        def acquire(*args): pass
+-        def release(*args): pass
+-
+-else:
+-    class SafeFunction:
+-        _l=thread.allocate_lock()
+-        _a=_l.acquire
+-        _r=_l.release
+-
+-        def __init__(self, f):
+-            self._f=f
+-
+-        def __call__(self, *args, **kw):
+-            self._a()
+-            try: return apply(self._f, args, kw)
+-            finally: self._r()
+-
+-    split=SafeFunction(split)
+-    sub=SafeFunction(sub)
+-    gsub=SafeFunction(gsub)
+-    splitx=SafeFunction(splitx)
+-    capwords=SafeFunction(capwords)
+-
+-    allocate_lock=thread.allocate_lock
+-
+-class compile:
+-
+-    _r=None
+-    groupindex=None
+-
+-    def __init__(self, *args):
+-        self._r=r=apply(regex.compile,args)
+-        self._init(r)
+-
+-    def _init(self, r):
+-        lock=allocate_lock()
+-        self.__a=lock.acquire
+-        self.__r=lock.release
+-        self.translate=r.translate
+-        self.givenpat=r.givenpat
+-        self.realpat=r.realpat
+-
+-    def match(self, string, pos=0):
+-        self.__a()
+-        try: return self._r.match(string, pos)
+-        finally: self.__r()
+-
+-    def search(self, string, pos=0):
+-        self.__a()
+-        try: return self._r.search(string, pos)
+-        finally: self.__r()
+-        
+-    def search_group(self, str, group, pos=0):
+-        """Search a string for a pattern.
+-
+-        If the pattern was not found, then None is returned,
+-        otherwise, the location where the pattern was found,
+-        as well as any specified group are returned.
+-        """
+-        self.__a()
+-        try:
+-            r=self._r
+-            l=r.search(str, pos)
+-            if l < 0: return None
+-            return l, apply(r.group, group)
+-        finally: self.__r()
+-
+-    def match_group(self, str, group, pos=0):
+-        """Match a pattern against a string
+-
+-        If the string does not match the pattern, then None is
+-        returned, otherwise, the length of the match, as well
+-        as any specified group are returned.
+-        """
+-        self.__a()
+-        try:
+-            r=self._r
+-            l=r.match(str, pos)
+-            if l < 0: return None
+-            return l, apply(r.group, group)
+-        finally: self.__r()
+-
+-    def search_regs(self, str, pos=0):
+-        """Search a string for a pattern.
+-
+-        If the pattern was not found, then None is returned,
+-        otherwise, the 'regs' attribute of the expression is
+-        returned.
+-        """
+-        self.__a()
+-        try:
+-            r=self._r
+-            r.search(str, pos)
+-            return r.regs
+-        finally: self.__r()
+-
+-    def match_regs(self, str, pos=0):
+-        """Match a pattern against a string
+-
+-        If the string does not match the pattern, then None is
+-        returned, otherwise, the 'regs' attribute of the expression is
+-        returned.
+-        """
+-        self.__a()
+-        try:
+-            r=self._r
+-            r.match(str, pos)
+-            return r.regs
+-        finally: self.__r()
+-
+-class symcomp(compile):
+-
+-    def __init__(self, *args):
+-        self._r=r=apply(regex.symcomp,args)
+-        self._init(r)
+-        self.groupindex=r.groupindex
+-
+-
+-
+-
+-        
+diff -ur qm-2.3.vanilla/qm/web.py qm-2.3/qm/web.py
+--- qm-2.3.vanilla/qm/web.py	2005-02-25 12:02:22.000000000 +0100
++++ qm-2.3/qm/web.py	2007-07-23 22:13:09.000000000 +0200
+@@ -46,6 +46,7 @@
+ import random
+ 
+ import qm.external.DocumentTemplate as DocumentTemplate
++sys.path.insert(1, os.path.dirname(os.path.dirname(DocumentTemplate.__file__)))
+ 
+ ########################################################################
+ # constants
