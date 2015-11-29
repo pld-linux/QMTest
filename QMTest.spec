@@ -12,7 +12,7 @@ Patch0:		%{name}-python25.patch
 URL:		http://www.codesourcery.com/qmtest/
 BuildRequires:	python
 BuildRequires:	rpm-pythonprov
-BuildRequires:	rpmbuild(macros) >= 1.219
+BuildRequires:	rpmbuild(macros) >= 1.710
 %pyrequires_eq  python
 BuildArch:	noarch
 BuildRoot:	%{tmpdir}/%{name}-%{version}-root-%(id -u -n)
