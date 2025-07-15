@@ -27,7 +27,7 @@ silnego i łatwego w użyciu procesu testowego.
 
 %prep
 %setup -q -n %{tarname}-%{version}
-#%patch0 -p1
+#%%patch0 -p1
 
 %build
 %py_build
